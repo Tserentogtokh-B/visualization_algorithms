@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <title> Крuskal algorithm</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #e8eaf6; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        h1 { margin-top: 0; color: #311b92; text-shadow: 1px 1px 2px #b39ddb; }
+        
+        .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; background: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button { padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; color: white; }
+        #startBtn { background-color: #2e7d32; }
+        #startBtn:hover { background-color: #1b5e20; }
+        #startBtn:disabled { background-color: #9e9e9e; cursor: not-allowed; }
+        #pauseBtn { background-color: #f57c00; }
+        #pauseBtn:hover { background-color: #e65100; }
+        #pauseBtn:disabled { background-color: #9e9e9e; cursor: not-allowed; }
+        #resetBtn { background-color: #1976d2; }
+        #resetBtn:hover { background-color: #0d47a1; }
+        .speed-control { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #333; }
+        
+        .main-container { display: flex; gap: 20px; width: 100%; max-width: 1300px; justify-content: center; align-items: stretch; }
+        
+        /* 1. Графын зураг */
+        #graph-box { width: 600px; height: 450px; background: #c5cae9; border: 4px solid #3f51b5; border-radius: 15px; position: relative; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.1); }
+        svg { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; }
+        
+        /* Хуучин графын "бүдэг зураг" (Blueprint) */
+        .edge { stroke: #b0bec5; stroke-width: 3; stroke-dasharray: 6,6; transition: 0.3s; }
+        
+        /* Шинээр баригдаж буй Граф */
+        .edge.target { stroke: #ffeb3b; stroke-width: 8; stroke-dasharray: none; filter: drop-shadow(0px 0px 6px #ffeb3b); } /* Шалгаж буй */
+        .edge.accepted { stroke: #2e7d32; stroke-width: 7; stroke-dasharray: none; filter: drop-shadow(0px 0px 3px #81c784); } /* ШИНЭ ГРАФ-д орсон */
+        .edge.rejected { stroke: #f44336; stroke-width: 2; stroke-dasharray: 3,3; opacity: 0.2; } /* Хог болсон хуучин зам */
+        
+        /* DFS-ийн хөл мөр (Шинэ граф дээгүүр) */
+        .edge.dfs-trace { stroke: #e91e63; stroke-width: 9; stroke-dasharray: none; filter: drop-shadow(0px 0px 8px #e91e63); z-index: 5; }
+
+        .weight-text { font-size: 16px; font-weight: bold; fill: #5c6bc0; transition: 0.3s; }
+        .weight-text.accepted { fill: #1b5e20; font-size: 20px; text-shadow: 2px 2px 0 #fff; }
+        .weight-text.rejected { fill: #f44336; opacity: 0.3; }
+
+        .node { position: absolute; z-index: 2; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); transition: all 0.3s ease; }
+        .emoji-circle { width: 50px; height: 50px; background: #fff; border: 3px solid #3f51b5; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 26px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.3s;}
+        .node-label { margin-top: 5px; font-size: 13px; font-weight: bold; background: rgba(255,255,255,0.9); padding: 2px 8px; border-radius: 6px; border: 1px solid #9fa8da;}
+        
+        .node.dfs-active .emoji-circle { background: #f8bbd0; border-color: #e91e63; transform: scale(1.2); box-shadow: 0 0 15px #e91e63; }
+        .node.start-target .emoji-circle { background: #fff59d; border-color: #fbc02d; }
+        .node.end-target .emoji-circle { background: #fff59d; border-color: #fbc02d; }
+
+        /* Status Board */
+        #status-board { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #1a237e; color: white; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: bold; z-index: 10; opacity: 0; transition: 0.3s; pointer-events: none; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3);}
+        #status-board.show { opacity: 1; transform: translateX(-50%) translateY(5px); }
+
+        /* 2. Хуучин Графын жагсаалт */
+        #edges-box { width: 220px; background: white; border: 2px solid #ddd; border-radius: 15px; display: flex; flex-direction: column; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .edges-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex-grow: 1; padding-right: 5px; }
+        .edge-item { padding: 10px; background: #e8eaf6; border: 2px solid #c5cae9; border-radius: 8px; font-size: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .edge-item.active { background: #fff59d; border-color: #fbc02d; transform: scale(1.05); }
+        .edge-item.accepted { background: #c8e6c9; color: #1b5e20; border-color: #4caf50; }
+        .edge-item.rejected { background: #ffcdd2; color: #b71c1c; border-color: #ef5350; text-decoration: line-through; opacity: 0.5; }
+
+        /* 3. ШИНЭ Псевдо-код */
+        #code-box { width: 360px; background: #282c34; color: #abb2bf; padding: 20px; border-radius: 15px; font-family: 'Consolas', monospace; font-size: 15px; line-height: 1.8; overflow-x: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .line { display: block; padding: 2px 8px; border-radius: 3px; border-left: 4px solid transparent; transition: 0.2s; }
+        .highlight { background: #3e4451; border-left: 4px solid #4fc3f7; color: #fff; }
+        .indent-1 { padding-left: 20px; } .indent-2 { padding-left: 40px; }
+        .kw { color: #c678dd; } .fn { color: #61afef; } .vr { color: #e5c07b; } .st { color: #56b6c2; }
+    </style>
+</head>
+<body>
+
+    <h1>Kruskal ажилуулах</h1>
+    
+    <div class="controls">
+        <button id="startBtn" onclick="startAlgorithm()">▶ Kruskal эхлүүлэх</button>
+        <button id="pauseBtn" onclick="togglePause()" disabled>⏸ Түр зогсоох</button>
+        <button id="resetBtn" onclick="location.reload()">🔄 Дахин эхлэх</button>
+        <div class="speed-control">
+            Удаан <input type="range" id="speedSlider" min="1" max="10" value="6"> Хурдан
+        </div>
+    </div>
+
+    <div class="main-container">
+        
+        <!-- 1. Граф -->
+        <div id="graph-box">
+            <svg id="edges"></svg>
+            <div id="nodes"></div>
+            <div id="status-board"></div>
+        </div>
+
+        <!-- 2. Үнийн санал -->
+        <div id="edges-box">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #3f51b5; text-align: center;">Графын замууд(Sort хийгдсэн)</h3>
+            <div class="edges-list" id="edges-list"></div>
+        </div>
+
+        <!-- 3. Код (Шинэ Граф гэдгээрээ тодорхой) -->
+        <div id="code-box">
+<span class="line" id="l1"><span class="vr">ГРАФ</span> = [] <span style="color:#5c6370;"></span></span>
+<br>
+<span class="line" id="l2"><span class="st">for</span> <span class="vr">гүүр</span>(A, B) <span class="st">in</span> <span class="vr">ХуучинГраф</span>:</span>
+<span class="line indent-1" id="l3"><span style="color:#5c6370;"></span></span>
+<span class="line indent-1" id="l4"><span class="vr">холбогдсонУу</span> = <span class="fn">DFS</span>(<span class="vr">ГРАФ</span>, A, B)</span>
+<br>
+<span class="line indent-1" id="l5"><span class="st">if</span> <span class="vr">холбогдсонУу</span> == <span class="kw">True</span>:</span>
+<span class="line indent-2" id="l6"><span class="fn">Хая</span>() <span style="color:#5c6370;"></span></span>
+<span class="line indent-1" id="l7"><span class="st">else</span>:</span>
+<span class="line indent-2" id="l8"><span class="vr">ГРАФ</span>.<span class="fn">Нэмэх</span>(<span class="vr">гүүр</span>) <span style="color:#5c6370;">//Нэгтгэх</span></span>
+        </div>
+    </div>
+
+<script>
+    const nodes = [
+        { id: '1', emoji: '🏰', name: 'Цайз', x: 300, y: 70 },
+        { id: '2', emoji: '🌲', name: 'Ой', x: 120, y: 150 },
+        { id: '3', emoji: '💎', name: 'Уурхай', x: 480, y: 150 },
+        { id: '4', emoji: '⛰️', name: 'Уул', x: 120, y: 320 },
+        { id: '5', emoji: '🐉', name: 'Луу', x: 480, y: 320 },
+        { id: '6', emoji: '🛖', name: 'Тосгон', x: 300, y: 240 }
+    ];
+
+    let edges = [
+        { u: '2', v: '4', w: 1 },
+        { u: '4', v: '6', w: 2 },
+        { u: '2', v: '6', w: 3 }, //   ТОЙРОГ 
+        { u: '6', v: '5', w: 4 },
+        { u: '1', v: '2', w: 5 },
+        { u: '1', v: '6', w: 6 }, //   ТОЙРОГ 
+        { u: '1', v: '3', w: 7 },
+        { u: '3', v: '5', w: 8 }  //   ТОЙРОГ 
+    ];
+
+    // ЭНЭ БОЛ ЯГ ЧИНИЙ ХЭЛСЭН "ШИНЭ ГРАФ"
+    let newGraphEdges = [];
+
+    const nodesDiv = document.getElementById('nodes');
+    const edgesSvg = document.getElementById('edges');
+    const edgesListDiv = document.getElementById('edges-list');
+    const statusBoard = document.getElementById('status-board');
+    
+    function showStatus(text, type='info') {
+        statusBoard.innerHTML = text;
+        statusBoard.classList.add('show');
+        if(type === 'error') statusBoard.style.background = '#d32f2f';
+        else if(type === 'success') statusBoard.style.background = '#2e7d32';
+        else statusBoard.style.background = '#3f51b5';
+    }
+    
+    function hideStatus() {
+        statusBoard.classList.remove('show');
+    }
+
+    edges.forEach((e) => {
+        const n1 = nodes.find(n => n.id === e.u);
+        const n2 = nodes.find(n => n.id === e.v);
+        e.id = `edge-${e.u}-${e.v}`; 
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', n1.x); line.setAttribute('y1', n1.y);
+        line.setAttribute('x2', n2.x); line.setAttribute('y2', n2.y);
+        line.setAttribute('class', 'edge');
+        line.setAttribute('id', `svg-${e.id}`);
+        edgesSvg.appendChild(line);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', (n1.x + n2.x) / 2);
+        text.setAttribute('y', ((n1.y + n2.y) / 2) - 10);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('class', 'weight-text');
+        text.setAttribute('id', `txt-${e.id}`);
+        text.textContent = `💰${e.w}`;
+        edgesSvg.appendChild(text);
+    });
+
+    nodes.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'node';
+        div.id = `node-${n.id}`;
+        div.style.left = n.x + 'px';
+        div.style.top = n.y + 'px';
+        div.innerHTML = `<div class="emoji-circle">${n.emoji}</div><div class="node-label">${n.name}</div>`;
+        nodesDiv.appendChild(div);
+    });
+
+    let isPaused = false;
+    let isRunning = false;
+
+    function togglePause() {
+        if (!isRunning) return;
+        isPaused = !isPaused;
+        const pBtn = document.getElementById('pauseBtn');
+        if (isPaused) {
+            pBtn.innerText = "▶ Үргэлжлүүлэх"; pBtn.style.backgroundColor = "#4caf50";
+        } else {
+            pBtn.innerText = "⏸ Түр зогсоох"; pBtn.style.backgroundColor = "#f57c00";
+        }
+    }
+
+    const sleep = async (multiplier = 1) => {
+        while (isPaused) await new Promise(r => setTimeout(r, 100));
+        let speed = document.getElementById('speedSlider').value;
+        let ms = (1500 - (speed * 120)) * multiplier; 
+        await new Promise(r => setTimeout(r, ms));
+        while (isPaused) await new Promise(r => setTimeout(r, 100));
+    };
+
+    function highlightLine(lineNum) {
+        document.querySelectorAll('.line').forEach(el => el.classList.remove('highlight'));
+        if(lineNum) document.getElementById('l' + lineNum).classList.add('highlight');
+    }
+
+    // --- DFS: ЗӨВХӨН ШИНЭ ГРАФ ДОТОР ШАЛГАНА ---
+    async function dfsInNewGraph(curr, target, visited, parent = null) {
+        document.getElementById(`node-${curr}`).classList.add('dfs-active');
+        await sleep(0.5);
+
+        if (curr === target) return true; 
+        visited.add(curr);
+
+        // Зөвхөн ШИНЭ_ГРАФ (newGraphEdges) дотор орсон замуудаар л гүйнэ!
+        let neighbors = [];
+        newGraphEdges.forEach(e => {
+            if (e.u === curr) neighbors.push({id: e.v, edgeId: e.id});
+            if (e.v === curr) neighbors.push({id: e.u, edgeId: e.id});
+        });
+
+        for (let i = 0; i < neighbors.length; i++) {
+            let neighbor = neighbors[i].id;
+            let eId = neighbors[i].edgeId;
+            
+            if (!visited.has(neighbor) && neighbor !== parent) {
+                let svgLine = document.getElementById(`svg-${eId}`);
+                svgLine.classList.add('dfs-trace');
+                await sleep(0.3);
+
+                if (await dfsInNewGraph(neighbor, target, visited, curr)) {
+                    svgLine.classList.remove('dfs-trace');
+                    document.getElementById(`node-${curr}`).classList.remove('dfs-active');
+                    return true;
+                }
+                
+                svgLine.classList.remove('dfs-trace');
+            }
+        }
+        
+        document.getElementById(`node-${curr}`).classList.remove('dfs-active');
+        return false;
+    }
+
+    async function startAlgorithm() {
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = false;
+        isRunning = true;
+        isPaused = false;
+        
+        highlightLine(1); await sleep(1);
+
+        edges.sort((a, b) => a.w - b.w);
+        
+        edges.forEach(e => {
+            const n1 = nodes.find(n => n.id === e.u);
+            const n2 = nodes.find(n => n.id === e.v);
+            let div = document.createElement('div');
+            div.className = 'edge-item';
+            div.id = `list-${e.id}`;
+            div.innerHTML = `<span>${n1.emoji}↔️${n2.emoji}</span> <span>💰${e.w}</span>`;
+            edgesListDiv.appendChild(div);
+        });
+
+        for (let i = 0; i < edges.length; i++) {
+            let edge = edges[i];
+            let n1 = nodes.find(n => n.id === edge.u);
+            let n2 = nodes.find(n => n.id === edge.v);
+            
+            highlightLine(2);
+            
+            document.getElementById(`list-${edge.id}`).classList.add('active');
+            document.getElementById(`svg-${edge.id}`).classList.add('target');
+            document.getElementById(`node-${n1.id}`).classList.add('start-target');
+            document.getElementById(`node-${n2.id}`).classList.add('end-target');
+            
+            document.getElementById(`list-${edge.id}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await sleep(1.5);
+
+            highlightLine(3); await sleep(0.3);
+            highlightLine(4);
+            
+            await sleep(1);
+
+            let visitedSet = new Set();
+            let pathFound = await dfsInNewGraph(edge.u, edge.v, visitedSet);
+
+            highlightLine(5); await sleep(0.5);
+
+            if (pathFound) {
+                highlightLine(6);                
+                document.getElementById(`svg-${edge.id}`).classList.remove('target');
+                document.getElementById(`svg-${edge.id}`).classList.add('rejected');
+                document.getElementById(`list-${edge.id}`).classList.remove('active');
+                document.getElementById(`list-${edge.id}`).classList.add('rejected');
+                document.getElementById(`txt-${edge.id}`).classList.add('rejected');
+            } else {
+                highlightLine(7); await sleep(0.3);
+                highlightLine(8);
+                
+                document.getElementById(`svg-${edge.id}`).classList.remove('target');
+                document.getElementById(`svg-${edge.id}`).classList.add('accepted');
+                document.getElementById(`list-${edge.id}`).classList.remove('active');
+                document.getElementById(`list-${edge.id}`).classList.add('accepted');
+                document.getElementById(`txt-${edge.id}`).classList.add('accepted');
+                
+                // ЭНЭ МӨЧИД ШИНЭ ГРАФ РУУГАА НЭМЖ БАЙНА
+                newGraphEdges.push(edge);
+                
+                if (newGraphEdges.length === nodes.length - 1) {
+                    await sleep(2);
+                    break;
+                }
+            }
+            
+            document.getElementById(`node-${n1.id}`).classList.remove('start-target');
+            document.getElementById(`node-${n2.id}`).classList.remove('end-target');
+            await sleep(2);
+            hideStatus();
+        }
+
+        highlightLine(); 
+        document.getElementById('pauseBtn').disabled = true;
+        isRunning = false;
+        showStatus();
+    }
+</script>
+
+</body>
+</html>

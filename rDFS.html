@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <title>DFS - Жинхэнэ Backtrack ба Call Stack</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #e0f7fa; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        h1 { margin-top: 0; color: #006064; text-shadow: 1px 1px 2px #b2ebf2; }
+        
+        .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; background: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button { padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; color: white; }
+        #startBtn { background-color: #2e7d32; }
+        #startBtn:hover { background-color: #1b5e20; }
+        #startBtn:disabled { background-color: #9e9e9e; cursor: not-allowed; }
+        #pauseBtn { background-color: #f57c00; }
+        #pauseBtn:hover { background-color: #e65100; }
+        #pauseBtn:disabled { background-color: #9e9e9e; cursor: not-allowed; }
+        #resetBtn { background-color: #1976d2; }
+        #resetBtn:hover { background-color: #0d47a1; }
+        .speed-control { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #333; }
+        
+        .main-container { display: flex; gap: 20px; width: 100%; max-width: 1300px; justify-content: center; align-items: stretch; }
+        
+        /* 1. Графын зураг */
+        #graph-box { width: 650px; height: 500px; background: #81d4fa; border: 4px solid #0288d1; border-radius: 15px; position: relative; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.1); }
+        svg { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; }
+        
+        /* Ирмэгүүдийн өнгө */
+        .edge { stroke: #0277bd; stroke-width: 4; stroke-dasharray: 8,8; transition: stroke 0.3s, stroke-width 0.3s; }
+        .edge.active { stroke: #ffeb3b; stroke-width: 6; stroke-dasharray: none; filter: drop-shadow(0px 0px 4px #ffeb3b); } /* Явж байгаа зам */
+        .edge.visited { stroke: #4caf50; stroke-width: 4; stroke-dasharray: none; } /* Буцсан/Дууссан зам */
+
+        .node { position: absolute; z-index: 2; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); transition: all 0.3s ease; }
+        .emoji-circle { width: 45px; height: 45px; background: #fff; border: 3px solid #0288d1; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: 0.3s; }
+        .node-label { margin-top: 5px; font-size: 12px; font-weight: bold; background: rgba(255,255,255,0.85); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+        
+        /* Node Төлөвүүд */
+        .visited .emoji-circle { background: #4caf50; border-color: #1b5e20; }
+        .current .emoji-circle { background: #ffeb3b; border-color: #f57f17; box-shadow: 0 0 20px #ffeb3b; transform: scale(1.3); }
+        
+        /* 2. Stack хэсэг */
+        #stack-box { width: 220px; background: white; border: 2px solid #ddd; border-radius: 15px; display: flex; flex-direction: column; padding: 15px; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #stack-container { display: flex; flex-direction: column-reverse; flex-grow: 1; justify-content: flex-start; width: 100%; border: 3px dashed #9e9e9e; border-top: none; border-radius: 0 0 10px 10px; padding: 5px; gap: 5px; height: 380px; overflow-y: auto; background: #fafafa; }
+        .stack-item { width: 100%; padding: 8px 0; background: #e91e63; color: white; text-align: center; font-weight: bold; border-radius: 6px; font-size: 15px; animation: popIn 0.2s ease-out; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        /* 3. Кодын хэсэг */
+        #code-box { width: 350px; background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 15px; font-family: 'Consolas', monospace; font-size: 15px; line-height: 1.6; overflow-x: auto; }
+        .line { display: block; padding: 2px 8px; border-radius: 3px; border-left: 4px solid transparent; transition: 0.2s; }
+        .highlight { background: #37373d; border-left: 4px solid #007acc; color: #fff; }
+        
+        .indent-1 { padding-left: 20px; }
+        .indent-2 { padding-left: 40px; }
+        .indent-3 { padding-left: 60px; }
+        
+        .kw { color: #569cd6; } 
+        .fn { color: #dcdcaa; } 
+        .vr { color: #9cdcfe; } 
+        .st { color: #c586c0; } 
+
+        @keyframes popIn { from { transform: translateY(-15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <h1>🗺️ Агуу Эрэл хайгуул - Жинхэнэ DFS (Backtrack)</h1>
+    
+    <div class="controls">
+        <button id="startBtn" onclick="startAlgorithm()">▶ Эхлэх</button>
+        <button id="pauseBtn" onclick="togglePause()" disabled>⏸ Түр зогсоох</button>
+        <button id="resetBtn" onclick="location.reload()">🔄 Дахин эхлэх</button>
+        <div class="speed-control">
+            Удаан <input type="range" id="speedSlider" min="1" max="10" value="7"> Хурдан
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- 1. Далайн зураг -->
+        <div id="graph-box">
+            <svg id="edges"></svg>
+            <div id="nodes"></div>
+        </div>
+
+        <!-- 2. Call Stack -->
+        <div id="stack-box">
+            <h3 style="margin: 0 0 5px 0; color: #333; font-size: 16px;">Дуудлагын Stack</h3>
+            <small style="margin-bottom: 10px; color:#666; text-align: center;">Буцах замыг хадгална</small>
+            <div id="stack-container"></div>
+        </div>
+
+        <!-- 3. Код (Рекурсив хувилбар) -->
+        <div id="code-box">
+<span class="line" id="l1"><span class="kw">function</span> <span class="fn">Start</span>():</span>
+<span class="line indent-1" id="l2"><span class="st">for</span> <span class="vr">island</span> <span class="st">in</span> <span class="vr">islands</span>:</span>
+<span class="line indent-2" id="l3"><span class="st">if</span> <span class="vr">island</span> <span class="st">not in</span> <span class="vr">visited</span>:</span>
+<span class="line indent-3" id="l4"><span class="fn">DFS</span>(<span class="vr">island</span>)</span>
+<br>
+<span class="line" id="l5"><span class="kw">function</span> <span class="fn">DFS</span>(<span class="vr">curr</span>):</span>
+<span class="line indent-1" id="l6"><span class="vr">visited</span>.add(<span class="vr">curr</span>)</span>
+<span class="line indent-1" id="l7"><span class="st">for</span> <span class="vr">neighbor</span> <span class="st">in</span> <span class="vr">curr</span>.neighbors:</span>
+<span class="line indent-2" id="l8"><span class="st">if</span> <span class="vr">neighbor</span> <span class="st">not in</span> <span class="vr">visited</span>:</span>
+<span class="line indent-3" id="l9"><span class="fn">DFS</span>(<span class="vr">neighbor</span>) <span style="color:#6a9955;">// Гүн рүү явах</span></span>
+<span class="line indent-1" id="l10"><span style="color:#6a9955;">// Мухардаад эсвэл дуусаад буцах</span></span>
+        </div>
+    </div>
+
+<script>
+    // Оройнууд
+    const nodes = [
+        { id: '1', emoji: '⛵', name: 'Онгоц', x: 80, y: 70 },
+        { id: '2', emoji: '🌴', name: 'Дал мод', x: 220, y: 50 },
+        { id: '3', emoji: '🌋', name: 'Галт уул', x: 80, y: 190 },
+        { id: '8', emoji: '🏴‍☠️', name: 'Дээрэмчин', x: 340, y: 90 },
+        { id: '9', emoji: '🗺️', name: 'Зураг', x: 220, y: 190 },
+        { id: '11', emoji: '⚓', name: 'Зангуу', x: 340, y: 200 },
+        { id: '4', emoji: '💎', name: 'Эрдэнэс', x: 460, y: 90 },
+        { id: '10', emoji: '🐙', name: 'Наймаалж', x: 80, y: 310 },
+        { id: '5', emoji: '🚁', name: 'Нисдэг тэрэг', x: 420, y: 310 },
+        { id: '6', emoji: '🐒', name: 'Сармагчин', x: 280, y: 360 },
+        { id: '12', emoji: '🐅', name: 'Бар', x: 150, y: 410 },
+        { id: '7', emoji: '🍌', name: 'Гадил', x: 420, y: 440 },
+        { id: '13', emoji: '🐍', name: 'Могой', x: 550, y: 370 },
+        { id: '14', emoji: '🛸', name: 'Таваг', x: 580, y: 80 },
+        { id: '15', emoji: '👽', name: 'Харь гариг', x: 580, y: 200 }
+    ];
+
+    const adjList = {
+        '1': ['2', '3'], 
+        '2': ['1', '8', '9'],
+        '3': ['1', '9', '10'],
+        '8': ['2', '4', '11'],
+        '9': ['2', '3', '11'],
+        '11': ['8', '9'],
+        '4': ['8'],
+        '10': ['3'],
+        '5': ['6', '13'],
+        '6': ['5', '7', '12'],
+        '7': ['6', '13'],
+        '12': ['6'],
+        '13': ['5', '7'],
+        '14': ['15'],
+        '15': ['14']
+    };
+
+    const nodesDiv = document.getElementById('nodes');
+    const edgesSvg = document.getElementById('edges');
+    
+    // Ирмэгүүдийг ID-тай зурах (Edge Animation хийхийн тулд)
+    let drawnEdges = new Set();
+    Object.keys(adjList).forEach(u => {
+        adjList[u].forEach(v => {
+            const edgeId = [u, v].sort().join('-');
+            if (!drawnEdges.has(edgeId)) {
+                drawnEdges.add(edgeId);
+                const n1 = nodes.find(n => n.id === u);
+                const n2 = nodes.find(n => n.id === v);
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', n1.x); line.setAttribute('y1', n1.y);
+                line.setAttribute('x2', n2.x); line.setAttribute('y2', n2.y);
+                line.setAttribute('class', 'edge');
+                line.setAttribute('id', `edge-${edgeId}`);
+                edgesSvg.appendChild(line);
+            }
+        });
+    });
+
+    nodes.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'node';
+        div.id = `node-${n.id}`;
+        div.style.left = n.x + 'px';
+        div.style.top = n.y + 'px';
+        div.innerHTML = `<div class="emoji-circle">${n.emoji}</div><div class="node-label">${n.name}</div>`;
+        nodesDiv.appendChild(div);
+    });
+
+    let isPaused = false;
+    let isRunning = false;
+    let visited = new Set();
+    let stackUI = [];
+
+    function togglePause() {
+        if (!isRunning) return;
+        isPaused = !isPaused;
+        const pBtn = document.getElementById('pauseBtn');
+        if (isPaused) {
+            pBtn.innerText = "▶ Үргэлжлүүлэх"; pBtn.style.backgroundColor = "#4caf50";
+        } else {
+            pBtn.innerText = "⏸ Түр зогсоох"; pBtn.style.backgroundColor = "#f57c00";
+        }
+    }
+
+    const sleep = async () => {
+        while (isPaused) await new Promise(r => setTimeout(r, 100));
+        let speed = document.getElementById('speedSlider').value;
+        let ms = 1300 - (speed * 110); 
+        await new Promise(r => setTimeout(r, ms));
+        while (isPaused) await new Promise(r => setTimeout(r, 100));
+    };
+
+    function highlightLine(lineNum) {
+        document.querySelectorAll('.line').forEach(el => el.classList.remove('highlight'));
+        if(lineNum) document.getElementById('l' + lineNum).classList.add('highlight');
+    }
+
+    function getEdgeId(u, v) {
+        return `edge-${[u, v].sort().join('-')}`;
+    }
+
+    function updateStackUI() {
+        const container = document.getElementById('stack-container');
+        container.innerHTML = '';
+        stackUI.forEach(id => {
+            let n = nodes.find(x => x.id === id);
+            let div = document.createElement('div');
+            div.className = 'stack-item';
+            div.innerText = `DFS(${n.emoji} ${n.name})`;
+            container.appendChild(div); 
+        });
+    }
+
+    function setCurrentNode(id) {
+        document.querySelectorAll('.node').forEach(el => el.classList.remove('current'));
+        if(id) document.getElementById(`node-${id}`).classList.add('current');
+    }
+
+    // РЕКУРСИВ DFS - Буцах (Backtrack) болон Call Stack тод харагдана
+    async function dfs(curr, parent = null) {
+        // Stack руу функц нэмэгдэх
+        stackUI.push(curr);
+        updateStackUI();
+        setCurrentNode(curr);
+        
+        // Хэрэв эцэгтэй бол ирсэн замаа гэрэлтүүлэх (Шар өнгө)
+        if (parent) {
+            let edge = document.getElementById(getEdgeId(parent, curr));
+            if(edge) edge.classList.add('active');
+        }
+
+        highlightLine(5); await sleep();
+        
+        visited.add(curr);
+        document.getElementById(`node-${curr}`).classList.add('visited');
+        highlightLine(6); await sleep();
+
+        let neighbors = adjList[curr];
+        for (let i = 0; i < neighbors.length; i++) {
+            let neighbor = neighbors[i];
+            
+            highlightLine(7); await sleep();
+            highlightLine(8); await sleep();
+            
+            if (!visited.has(neighbor)) {
+                highlightLine(9); await sleep();
+                await dfs(neighbor, curr); // Гүн рүүгээ өөрийгөө дуудах
+                
+                // --- ЭНД БУЦАЖ ИРЖ БАЙНА (BACKTRACKING) ---
+                // Буцаж ирэх үед замаа ногоон болгох
+                let edge = document.getElementById(getEdgeId(curr, neighbor));
+                if(edge) {
+                    edge.classList.remove('active');
+                    edge.classList.add('visited');
+                }
+                
+                // Баатар буцаж тухайн цэг дээрээ ирснийг харуулах
+                setCurrentNode(curr);
+                highlightLine(10); await sleep();
+            }
+        }
+
+        // Энэ цэгээс цааш явах замгүй болсон тул Stack-аас гарч байна
+        stackUI.pop();
+        updateStackUI();
+        
+        // Буцаж байгаа замыг ногоон болгох
+        if (parent) {
+            let edge = document.getElementById(getEdgeId(parent, curr));
+            if(edge) {
+                edge.classList.remove('active');
+                edge.classList.add('visited');
+            }
+        }
+    }
+
+    async function startAlgorithm() {
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = false;
+        isRunning = true;
+        isPaused = false;
+        
+        highlightLine(1); await sleep();
+
+        // 3 салангид бүлгийг алгасахгүй дуудах
+        for (let i = 0; i < nodes.length; i++) {
+            let startNode = nodes[i].id;
+            
+            highlightLine(2); await sleep();
+            highlightLine(3); await sleep();
+            
+            if (!visited.has(startNode)) {
+                highlightLine(4); await sleep();
+                await dfs(startNode);
+            }
+        }
+        
+        highlightLine(); 
+        setCurrentNode(null);
+        document.getElementById('pauseBtn').disabled = true;
+        isRunning = false;
+        
+        setTimeout(() => {
+            alert("🎉 Аялал дууслаа! Замаар хэрхэн буцаж (backtrack) явааг харсан биз дээ?");
+        }, 500);
+    }
+</script>
+
+</body>
+</html>
